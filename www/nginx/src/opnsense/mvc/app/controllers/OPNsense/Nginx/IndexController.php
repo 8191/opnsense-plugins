@@ -45,29 +45,44 @@ class IndexController extends \OPNsense\Base\IndexController
     public function indexAction()
     {
         $this->view->settings = $this->getForm("settings");
-        $this->view->upstream_server = $this->getForm("upstream_server");
-        $this->view->upstream = $this->getForm("upstream");
+        $this->view->limit_request_connection = $this->getForm("limit_request_connection");
+        $this->view->limit_zone = $this->getForm("limit_zone");
+        $this->view->ipacl = $this->getForm("ipacl");
+        $this->view->syslog_target = $this->getForm("syslog_target");
+        $this->view->pick('OPNsense/Nginx/index');
+    }
+
+    public function httpAction()
+    {
         $this->view->location = $this->getForm("location");
         $this->view->credential = $this->getForm("credential");
         $this->view->userlist = $this->getForm("userlist");
         $this->view->httpserver = $this->getForm("httpserver");
-        $this->view->streamserver = $this->getForm("streamserver");
         $this->view->httprewrite = $this->getForm("httprewrite");
         $this->view->naxsi_rule = $this->getForm("naxsi_rule");
         $this->view->naxsi_custom_policy = $this->getForm("naxsi_custom_policy");
         $this->view->security_headers = $this->getForm("security_headers");
-        $this->view->limit_request_connection = $this->getForm("limit_request_connection");
-        $this->view->limit_zone = $this->getForm("limit_zone");
         $this->view->cache_path = $this->getForm("cache_path");
-        $this->view->sni_hostname_map = $this->getForm("sni_hostname_map");
-        $this->view->ipacl = $this->getForm("ipacl");
         $this->view->tls_fingerprint = $this->getForm("tls_fingerprint");
-        $this->view->syslog_target = $this->getForm("syslog_target");
         $nginx = new Nginx();
         $this->view->show_naxsi_download_button =
             count(iterator_to_array($nginx->custom_policy->iterateItems())) == 0 &&
             count(iterator_to_array($nginx->naxsi_rule->iterateItems())) == 0;
-        $this->view->pick('OPNsense/Nginx/index');
+        $this->view->pick('OPNsense/Nginx/http');
+    }
+
+    public function streamsAction()
+    {
+        $this->view->streamserver = $this->getForm("streamserver");
+        $this->view->sni_hostname_map = $this->getForm("sni_hostname_map");
+        $this->view->pick('OPNsense/Nginx/streams');
+    }
+
+    public function upstreamsAction()
+    {
+        $this->view->upstream_server = $this->getForm("upstream_server");
+        $this->view->upstream = $this->getForm("upstream");
+        $this->view->pick('OPNsense/Nginx/upstreams');
     }
 
     /**
