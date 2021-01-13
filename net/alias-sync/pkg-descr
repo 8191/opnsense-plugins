@@ -1,0 +1,8 @@
+This plugin allows synchronizing firewall aliases over several OPNsense instances.
+
+Typically one master instance is designated, which is the only instance where
+alias records are maintained. The master instance then synchronizes the
+records to all other configured OPNsense instances.
+
+Synchronization is done via the OPNsense Core API. This plugin is only required
+on the master instance.

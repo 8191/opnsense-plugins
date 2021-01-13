@@ -1,0 +1,20 @@
+<form>
+    <field>
+        <id>aliassync.general.enabled</id>
+        <label>Enabled</label>
+        <type>checkbox</type>
+        <help>Enable alias sync service</help>
+    </field>
+    <field>
+        <id>aliassync.general.syncInterval</id>
+        <label>Sync interval</label>
+        <type>text</type>
+        <help><![CDATA[Interval in seconds for regular syncing.]]></help>
+    </field>
+    <field>
+        <id>aliassync.general.syncOnUpdate</id>
+        <label>Sync on update</label>
+        <type>checkbox</type>
+        <help><![CDATA[Trigger sync on alias update.]]></help>
+    </field>
+</form>

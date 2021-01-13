@@ -1,0 +1,42 @@
+<form>
+    <field>
+        <id>target.enabled</id>
+        <label>Enabled</label>
+        <type>checkbox</type>
+    </field>
+    <field>
+        <id>target.hostname</id>
+        <label>Hostname</label>
+        <type>text</type>
+        <help><![CDATA[Hostname or IP address of target OPNsense instance.]]></help>
+    </field>
+    <field>
+        <id>target.port</id>
+        <label>Port</label>
+        <type>text</type>
+        <help><![CDATA[Port of Web GUI of target OPNsense instance if default port of 443 was changed.]]></help>
+        <advanced>true</advanced>
+    </field>
+    <field>
+        <id>target.apiKey</id>
+        <label>API Key</label>
+        <type>text</type>
+    </field>
+    <field>
+        <id>target.apiSecret</id>
+        <label>API Secret</label>
+        <type>text</type>
+    </field>
+    <field>
+        <id>target.description</id>
+        <label>Description</label>
+        <type>text</type>
+    </field>
+    <field>
+        <id>target.timeout</id>
+        <label>Timeout</label>
+        <type>text</type>
+        <help><![CDATA[Time in seconds to wait for connection timeout (default 30 sec).]]></help>
+        <advanced>true</advanced>
+    </field>
+</form>
