@@ -1,18 +1,18 @@
 <form>
     <field>
-        <id>aliassync.general.enabled</id>
+        <id>aliassync.settings.enabled</id>
         <label>Enabled</label>
         <type>checkbox</type>
         <help>Enable alias sync service</help>
     </field>
     <field>
-        <id>aliassync.general.syncInterval</id>
-        <label>Sync interval</label>
+        <id>aliassync.settings.retryInterval</id>
+        <label>Retry interval (minutes)</label>
         <type>text</type>
-        <help><![CDATA[Interval in seconds for regular syncing.]]></help>
+        <help><![CDATA[Interval in seconds to retry failed syncs. 0 disables automatic retries.]]></help>
     </field>
     <field>
-        <id>aliassync.general.syncOnUpdate</id>
+        <id>aliassync.settings.syncOnUpdate</id>
         <label>Sync on update</label>
         <type>checkbox</type>
         <help><![CDATA[Trigger sync on alias update.]]></help>

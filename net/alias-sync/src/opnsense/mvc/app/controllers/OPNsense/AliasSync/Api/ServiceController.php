@@ -1,4 +1,5 @@
 <?php
+
 /**
  *    Copyright (C) 2021 Manuel Faux
  *
@@ -46,7 +47,7 @@ class ServiceController extends ApiControllerBase
         $status = "failed";
         if ($this->request->isPost()) {
             $backend = new Backend();
-            $bckresult = json_decode(trim($backend->configdRun("aliassync sync $target")));
+            $bckresult = json_decode(trim($backend->configdRun("aliassync sync $target")), true);
             if ($bckresult !== null) {
                 return $bckresult;
             }

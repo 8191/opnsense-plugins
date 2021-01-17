@@ -1,4 +1,5 @@
 <?php
+
 /**
  *    Copyright (C) 2021 Manuel Faux
  *
@@ -39,8 +40,8 @@ class IndexController extends \OPNsense\Base\IndexController
     {
         // pick the template to serve to our users.
         $this->view->pick('OPNsense/AliasSync/index');
-        // fetch form data "general" in
-        $this->view->formGeneral = $this->getForm("general");
+        // fetch form data "settings" in
+        $this->view->formGeneral = $this->getForm("settings");
         $this->view->formDialogTarget = $this->getForm("target");
     }
 }

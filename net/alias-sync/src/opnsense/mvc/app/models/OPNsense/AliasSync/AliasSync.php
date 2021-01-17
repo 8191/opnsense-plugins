@@ -1,4 +1,5 @@
 <?php
+
 /**
  *    Copyright (C) 2021 Manuel Faux
  *
@@ -29,8 +30,133 @@
 
 namespace OPNsense\AliasSync;
 
+use OPNsense\AliasSync\FieldTypes\VirtualField;
 use OPNsense\Base\BaseModel;
 
 class AliasSync extends BaseModel
 {
+    /**
+     * @var \SQLite3 database handle
+     */
+    private $dbHandle = null;
+
+    /**
+     * @var array contains all rows of the targets sqlite table
+     */
+    private $dbData = array();
+
+    /**
+     * Updates or inserts a row in the database for each target of the XML model.
+     *
+     * @param string $uuid the uuid of the target to update
+     * @param array $field values to update (attribute name as keys)
+     */
+    public function serializeToDatabase()
+    {
+        foreach ($this->targets->target->__items as $target) {
+            $uuid = $target->getAttribute('uuid');
+            $this->saveTargetToDatabase($uuid, array(
+                'lastSync' => $target->lastSync,
+                'statusLastSync' => $target->statusLastSync,
+                'lastSuccessfulSync' => $target->lastSuccessfulSync
+            ));
+        }
+    }
+
+    /**
+     * Populate VirtualFields with data from sqlite3 database
+     */
+    protected function init()
+    {
+        $this->openDatabase();
+        $this->queryDatabase();
+
+        // For each target...
+        foreach ($this->targets->target->__items as $target) {
+            // ...iterate throught all fields...
+            foreach ($target->__items as $attribute) {
+                // ...and search for VirtualFields.
+                if (get_class($attribute) == 'OPNsense\AliasSync\FieldTypes\VirtualField') {
+                    $uuid = $target->getAttribute('uuid');
+                    // Value already set in sqlite
+                    if (!empty($this->dbData[$uuid][$attribute->getInternalXMLTagName()])) {
+                        $attribute->setValue($this->dbData[$uuid][$attribute->getInternalXMLTagName()]);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Updates or inserts a row in the database.
+     *
+     * @param string $uuid the uuid of the target to update
+     * @param array $field values to update (attribute name as keys)
+     */
+    private function saveTargetToDatabase($uuid, $fields)
+    {
+        // Target not in database (insert)
+        if (empty($this->dbData[$uuid])) {
+            $stmt = $this->dbHandle->prepare('
+                insert into targets(uuid, lastSync, statusLastSync, lastSuccessfulSync)
+                values (:uuid, :lastSync, :statusLastSync, :lastSuccessfulSync)
+            ');
+            $stmt->bindValue(':uuid', $uuid);
+            $stmt->bindValue(':lastSync', (empty($fields['lastSync'])) ? 0 : $fields['lastSync']);
+            $stmt->bindValue(':statusLastSync', (empty($fields['statusLastSync'])) ? "" : $fields['statusLastSync']);
+            $stmt->bindValue(':lastSuccessfulSync', (empty($fields['lastSuccessfulSync'])) ? 0 : $fields['lastSuccessfulSync']);
+            $stmt->execute();
+        }
+        // Target in database (update)
+        else {
+            // Update row
+            $stmt = $this->dbHandle->prepare('
+                update targets
+                set lastSync = :lastSync,
+                    statusLastSync = :statusLastSync,
+                    lastSuccessfulSync = :lastSuccessfulSync
+                where uuid = :uuid
+            ');
+            $stmt->bindValue(':uuid', $uuid);
+            $stmt->bindValue(':lastSync', (empty($fields['lastSync'])) ? $this->dbData[$uuid]['lastSync'] : $fields['lastSync']);
+            $stmt->bindValue(':statusLastSync', (empty($fields['statusLastSync'])) ? $this->dbData[$uuid]['lastSync'] : $fields['statusLastSync']);
+            $stmt->bindValue(':lastSuccessfulSync', (empty($fields['lastSuccessfulSync'])) ? $this->dbData[$uuid]['lastSuccessfulSync'] : $fields['lastSuccessfulSync']);
+            $stmt->execute();
+        }
+    }
+
+    private function openDatabase()
+    {
+        $db_path = '/conf/aliassync.db';
+        $this->dbHandle = new \SQLite3($db_path);
+        $this->dbHandle->busyTimeout(30000);
+        $results = $this->dbHandle->query("PRAGMA table_info('targets')");
+        $known_fields = array();
+        while ($row = $results->fetchArray(SQLITE3_ASSOC)) {
+            $known_fields[] = $row['name'];
+        }
+        if (count($known_fields) == 0) {
+            // new database, setup
+            $sql_create = "
+                create table targets (
+                      uuid               varchar2  -- target uui
+                    , lastSync           integer   -- time of last sync attempt
+                    , statusLastSync     varchar2  -- status of last sync attempt
+                    , lastSuccessfulSync integer   -- time of last successful sync
+                    , primary key (uuid)
+                );
+            ";
+            $this->dbHandle->exec($sql_create);
+        }
+    }
+
+    private function queryDatabase()
+    {
+        $this->dbData = array();
+        $stmt = $this->dbHandle->prepare('select * from targets');
+        $result = $stmt->execute();
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $this->dbData[$row['uuid']] = $row;
+        }
+    }
 }

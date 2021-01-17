@@ -31,25 +31,10 @@ require_once("legacy_bindings.inc");
 
 use OPNsense\AliasSync\Sync;
 
-$single_target = null;
-if ($_SERVER['argc'] > 1) {
-    $single_target = $_SERVER['argv'][1];
-}
-
 $sync = new Sync();
-// Sync one specific target
-if ($single_target !== null) {
-    $target = $sync->getTarget($single_target);
-    if ($target !== null) {
-        $results = $sync->sync($target);
-    }
-    else {
-        $results = array('status' => "failed", 'error' => "Invalid target passed.");
-    }
-}
-// Sync all targets
-else {
-    $results = $sync->syncAll();
+if (!$sync->checkEnabled()) {
+    exit;
 }
 
+$results = $sync->syncFailed(true);
 echo json_encode($results) . "\n";

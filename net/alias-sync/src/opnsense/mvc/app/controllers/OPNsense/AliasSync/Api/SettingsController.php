@@ -1,4 +1,5 @@
 <?php
+
 /**
  *    Copyright (C) 2021 Manuel Faux
  *
@@ -42,7 +43,82 @@ class SettingsController extends ApiMutableModelControllerBase
     protected static $internalModelClass = '\OPNsense\AliasSync\AliasSync';
     protected static $internalModelName = 'aliassync';
 
-    public function searchItemAction()
+    public function getAction()
+    {
+        $result = array();
+        $result[static::$internalModelName] = [
+            "settings" => $this->getModel()->settings->getNodes()
+        ];
+        return $result;
+    }
+
+    protected function setActionHook()
+    {
+        $result = null;
+        // XXX resolve
+        return null;
+        if ($this->request->isPost()) {
+            $mdlAS = $this->getModel();
+            $backend = new Backend();
+
+            // Setup cronjob if AliasSync and AutoRenewal is enabled.
+            if (
+                (string)$mdlAcme->settings->RetryCron == "" and
+                (string)$mdlAcme->settings->retryInterval == "1" and
+                (string)$mdlAcme->settings->enabled == "1"
+            ) {
+                $mdlCron = new Cron();
+                // NOTE: Only configd actions are valid commands for cronjobs
+                //       and they *must* provide a description that is not empty.
+                $cron_uuid = $mdlCron->newDailyJob(
+                    "AcmeClient",
+                    "acmeclient cron-auto-renew",
+                    "AcmeClient Cronjob for Certificate AutoRenewal",
+                    "*",
+                    "1"
+                );
+                $mdlAcme->settings->UpdateCron = $cron_uuid;
+
+                // Save updated configuration.
+                if ($mdlCron->performValidation()->count() == 0) {
+                    $mdlCron->serializeToConfig();
+                    // save data to config, do not validate because the current in memory model doesn't know about the
+                    // cron item just created.
+                    $mdlAcme->serializeToConfig($validateFullModel = false, $disable_validation = true);
+                    Config::getInstance()->save();
+                    // Refresh the crontab
+                    $backend->configdRun('template reload OPNsense/Cron');
+                } else {
+                    $result = "unable to add cron";
+                }
+            // Delete cronjob if AcmeClient or AutoRenewal is disabled.
+            } elseif (
+                (string)$mdlAcme->settings->UpdateCron != "" and
+                ((string)$mdlAcme->settings->autoRenewal == "0" or
+                (string)$mdlAcme->settings->enabled == "0")
+            ) {
+                // Get UUID, clean existin entry
+                $cron_uuid = (string)$mdlAcme->settings->UpdateCron;
+                $mdlAcme->settings->UpdateCron = null;
+                $mdlCron = new Cron();
+                // Delete the cronjob item
+                if ($mdlCron->jobs->job->del($cron_uuid)) {
+                    // If item is removed, serialize to config and save
+                    $mdlCron->serializeToConfig();
+                    $mdlAcme->serializeToConfig($validateFullModel = false, $disable_validation = true);
+                    Config::getInstance()->save();
+                    // Regenerate the crontab
+                    $backend->configdRun('template reload OPNsense/Cron');
+                } else {
+                    $result = "unable to delete cron";
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    public function searchTargetAction()
     {
         return $this->searchBase("targets.target", array(
                 'enabled', 'hostname', 'description', 'apiKey', 'lastSync',
@@ -50,37 +126,28 @@ class SettingsController extends ApiMutableModelControllerBase
             ), "hostname");
     }
 
-    public function setItemAction($uuid)
+    public function setTargetAction($uuid)
     {
         return $this->setBase("target", "targets.target", $uuid);
     }
 
-    public function addItemAction()
+    public function addTargetAction()
     {
         return $this->addBase("target", "targets.target");
     }
 
-    public function getItemAction($uuid = null)
+    public function getTargetAction($uuid = null)
     {
         return $this->getBase("target", "targets.target", $uuid);
     }
 
-    public function delItemAction($uuid)
+    public function delTargetAction($uuid)
     {
         return $this->delBase("targets.target", $uuid);
     }
 
-    public function toggleItemAction($uuid, $enabled = null)
+    public function toggleTargetAction($uuid, $enabled = null)
     {
         return $this->toggleBase("targets.target", $uuid, $enabled);
-    }
-
-    public function getAction()
-    {
-        $result = array();
-        $result[static::$internalModelName] = [
-            "general" => $this->getModel()->general->getNodes()
-        ];
-        return $result;
     }
 }

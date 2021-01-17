@@ -28,13 +28,13 @@ POSSIBILITY OF SUCH DAMAGE.
 
 <script>
     $( document ).ready(function() {
-        $("#grid-targets").UIBootgrid(
-            {   search:'/api/aliassync/settings/searchItem/',
-                get:'/api/aliassync/settings/getItem/',
-                set:'/api/aliassync/settings/setItem/',
-                add:'/api/aliassync/settings/addItem/',
-                del:'/api/aliassync/settings/delItem/',
-                toggle:'/api/aliassync/settings/toggleItem/',
+        let targets_grid = $("#grid-targets").UIBootgrid(
+            {   search:'/api/aliassync/settings/searchTarget/',
+                get:'/api/aliassync/settings/getTarget/',
+                set:'/api/aliassync/settings/setTarget/',
+                add:'/api/aliassync/settings/addTarget/',
+                del:'/api/aliassync/settings/delTarget/',
+                toggle:'/api/aliassync/settings/toggleTarget/',
                 options: {
                     formatters: {
                         "commands": function (column, row) {
@@ -69,20 +69,44 @@ POSSIBILITY OF SUCH DAMAGE.
                 }
             }
         );
-        var data_get_map = {'frm_general_settings':"/api/aliassync/settings/get"};
+        // Sync command (per row in table)
+        targets_grid.on('loaded.rs.jquery.bootgrid', function() {
+            targets_grid.find('.command-sync').on('click', function(e) {
+                icon = $("span", this);
+                icon.addClass("fa-spin");
+                ajaxCall(
+                    url="/api/aliassync/service/sync/" + $(this).data('row-id'),
+                    sendData={},
+                    callback=function(data,status,elem=icon) {
+                        elem.removeClass("fa-spin");
+                        targets_grid.bootgrid("reload");
+                        // TODO: switch to previously selected page
+                    }
+                );
+            });
+        });
+
+        // Populate configuration form
+        var data_get_map = {'frm_settings':"/api/aliassync/settings/get"};
         mapDataToFormUI(data_get_map).done(function(data){
             formatTokenizersUI();
             $('.selectpicker').selectpicker('refresh');
         });
 
+        let disable_save_animation = function(){
+                // disable progress animation
+                $('#saveAct_progress').removeClass("fa fa-spinner fa-pulse");
+            };
+
         // link save button to API set action
         $("#saveAct").click(function(){
-            saveFormToEndpoint(url="/api/aliassync/settings/set",formid='frm_general_settings',callback_ok=function(){
-                // action to run after successful save, for example reconfigure service.
-                ajaxCall(url="/api/aliassync/service/reload", sendData={},callback=function(data,status) {
-                    // action to run after reload
-                });
-            });
+            // set progress animation
+            $('#saveAct_progress').addClass("fa fa-spinner fa-pulse");
+            // save configuration
+            saveFormToEndpoint(url="/api/aliassync/settings/set",formid='frm_settings',
+                callback_ok=disable_save_animation,
+                disable_dialog=true,
+                callback_fail=disable_save_animation);
         });
 
         $("#testAct").click(function(){
@@ -110,14 +134,14 @@ POSSIBILITY OF SUCH DAMAGE.
 </div>
 
 <ul class="nav nav-tabs" data-tabs="tabs" id="maintabs">
-    <li class="active"><a data-toggle="tab" href="#general">{{ lang._('Configuration') }}</a></li>
+    <li class="active"><a data-toggle="tab" href="#settings">{{ lang._('Configuration') }}</a></li>
     <li><a data-toggle="tab" href="#targets">{{ lang._('Targets') }}</a></li>
 </ul>
 
 <div class="tab-content content-box">
-    <div id="general" class="tab-pane fade in active">
-        <!-- tab page "general" -->
-        {{ partial("layout_partials/base_form",['fields':formGeneral,'id':'frm_general_settings'])}}
+    <div id="settings" class="tab-pane fade in active">
+        <!-- tab page "settings" -->
+        {{ partial("layout_partials/base_form",['fields':formGeneral,'id':'frm_settings'])}}
     </div>
     <div id="targets" class="tab-pane">
         <!-- tab page "targets" -->
@@ -150,7 +174,7 @@ POSSIBILITY OF SUCH DAMAGE.
     </div>
     <div class="col-md-12">
         <hr/>
-        <button class="btn btn-primary" id="saveAct" type="button">{{ lang._('Apply') }}</button>
+        <button class="btn btn-primary" id="saveAct" type="button"><b>{{ lang._('Apply') }}</b><i id="saveAct_progress" class=""></i></button>
         <br/><br/>
     </div>
 </div>
