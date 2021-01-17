@@ -32,10 +32,10 @@ require_once("legacy_bindings.inc");
 use OPNsense\AliasSync\Sync;
 
 $sync = new Sync();
-if (!$sync->checkEnabled()) {
+if (!($sync->checkEnabled() && $sync->configUpdateEnabled())) {
+    syslog(LOG_NOTICE, "AliasSync: sync disabled.");
     exit;
 }
 
 $results = $sync->syncAll();
-$sync->save();
-syslog(LOG_NOTICE, "AliasSync: Sync triggered due to modified aliases. Status: " . json_encode($results));
+syslog(LOG_NOTICE, "AliasSync: sync triggered due to modified configuration. Result: " . json_encode($results));

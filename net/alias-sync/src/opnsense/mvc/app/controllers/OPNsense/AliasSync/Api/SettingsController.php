@@ -122,7 +122,7 @@ class SettingsController extends ApiMutableModelControllerBase
     {
         return $this->searchBase("targets.target", array(
                 'enabled', 'hostname', 'description', 'apiKey', 'lastSync',
-                'statusLastSync', 'lastSuccessfulSync'
+                'statusLastSync', 'lastSuccessfulSync', 'detailsLastSync'
             ), "hostname");
     }
 

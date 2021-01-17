@@ -13,8 +13,8 @@
     </field>
     <field>
         <id>aliassync.settings.syncOnUpdate</id>
-        <label>Sync on update</label>
+        <label>Sync on config update</label>
         <type>checkbox</type>
-        <help><![CDATA[Trigger sync on alias update.]]></help>
+        <help><![CDATA[Trigger sync on local configuration update. The sync itself is only performed if synced configuration has changed.]]></help>
     </field>
 </form>

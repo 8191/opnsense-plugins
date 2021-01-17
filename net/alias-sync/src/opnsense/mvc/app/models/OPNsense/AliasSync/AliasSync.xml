@@ -70,12 +70,22 @@
                 </description>
                 <!-- Virtual fields not persisted to XML but sqlite3 -->
                 <lastSync type=".\VirtualField">
+                    <Type>integer</Type>
                     <default>0</default>
                 </lastSync>
-                <statusLastSync type=".\VirtualField" />
+                <statusLastSync type=".\VirtualField">
+                    <Type>varchar2</Type>
+                </statusLastSync>
+                <detailsLastSync type=".\VirtualField">
+                    <Type>varchar2</Type>
+                </detailsLastSync>
                 <lastSuccessfulSync type=".\VirtualField">
+                    <Type>integer</Type>
                     <default>0</default>
                 </lastSuccessfulSync>
+                <syncedAliases type=".\VirtualField">
+                    <Type>varchar2</Type>
+                </syncedAliases>
             </target>
         </targets>
     </items>

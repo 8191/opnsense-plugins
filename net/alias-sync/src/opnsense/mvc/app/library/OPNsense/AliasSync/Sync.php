@@ -40,7 +40,7 @@ class Sync
     /**
      * @var \OPNsense\AliasSync\AliasSync model object
      */
-    private $mdl;
+    private $mdlAliasSync;
 
     /**
      * @var \OPNsense\Firewall\Alias model object
@@ -53,16 +53,21 @@ class Sync
     private $aliases = null;
 
     /**
+     * @var string sha1 hash of Aliases XML data structure
+     */
+    private $aliasesHash = "";
+
+    /**
      * @var bool defines if AliasSync is enabled via config
      */
     private $enabled = false;
 
     public function __construct()
     {
-        $this->mdl = new AliasSync();
+        $this->mdlAliasSync = new AliasSync();
         $this->mdlAlias = new Alias();
 
-        $this->enabled = !empty((string)$this->mdl->settings->enabled);
+        $this->enabled = !empty((string)$this->mdlAliasSync->settings->enabled);
     }
 
     /**
@@ -73,9 +78,9 @@ class Sync
      */
     public function getTarget($id)
     {
-        $result = $this->mdl->getNodeByReference("targets.target.$id");
+        $result = $this->mdlAliasSync->getNodeByReference("targets.target.$id");
         if ($result === null) {
-            foreach ($this->mdl->targets->target->__items as $target) {
+            foreach ($this->mdlAliasSync->targets->target->__items as $target) {
                 if ($target->hostname == $id) {
                     return $target;
                 }
@@ -89,20 +94,29 @@ class Sync
      * Attempts to sync a target regardless of its last sync status.
      *
      * @param \OPNsense\AliasSync\AliasSync $target target object to sync
+     * @param boolean $force sync even when source data did not change since last successful sync
      * @return array result of the sync attempt
      */
-    public function sync($target)
+    public function sync($target, $force = false)
     {
         if (!$this->enabled) {
-            return array('status' => "failed", 'error' => "Alias synchronization globally disabled by configuration.");
+            return array('status' => "failed", 'details' => "Alias synchronization globally disabled by configuration.");
         }
 
         $result = array();
         if (!empty((string)$target->enabled)) {
             $result['status'] = "failed";
 
-            if ($this->aliases === null) {
+            if ($this->aliases === null || $this->aliasesHash) {
                 $this->aliases = $this->getRawNodes($this->mdlAlias);
+                $this->aliasesHash = sha1($this->mdlAlias->toXML()->asXML());
+            }
+
+            if (!$force && $target->syncedAliases == $this->aliasesHash) {
+                // Target is already up-to-date.
+                $result['status'] = "ok";
+                $result['details'] = "No changes since last sync.";
+                return $result;
             }
 
             $port = (empty($target->port)) ? 443 : intval((string)$target->port);
@@ -124,44 +138,50 @@ class Sync
             $errno = curl_errno($curl);
             curl_close($curl);
 
-            $result['http'] = $code;
             if ($errno == 0 && $code == 200) {
                 if (!empty($response['status'])) {
                     $result['status'] = $response['status'];
 
                     if ($result['status'] == "ok") {
                         $target->lastSuccessfulSync = time();
+                        $target->syncedAliases = $this->aliasesHash;
+                        $result['details'] = "Added {$response['new']} of {$response['existing']} aliases.";
+                    }
+                    else {
+                        $result['details'] = "Syncing rejected by target.";
+                        $result['validations'] = $response['validations'];
                     }
                 }
             }
             else {
-                $result['code'] = $errno;
-                $result['error'] = $error;
+                $result['details'] = "$errno: $error";
             }
 
             $target->lastSync = time();
             $target->statusLastSync = $result['status'];
+            $target->detailsLastSync = $result['details'];
         }
         else {
-            return array('status' => "failed", 'error' => "Target disabled by configuration.");
+            return array('status' => "failed", 'details' => "Target disabled by configuration.");
         }
 
         // TODO: move out (to prevent several savings when calling method in loop (e.g. in syncAll or syncFailed)
-        $this->mdl->serializeToDatabase();
+        $this->mdlAliasSync->serializeToDatabase();
         return $result;
     }
 
     /**
      * Attempts to sync all defined targets regardless of their last sync status.
      *
+     * @param boolean $force sync even when source data did not change since last successful sync
      * @return array status of the sync attempts
      */
-    public function syncAll()
+    public function syncAll($force = false)
     {
         $results = array();
-        foreach ($this->mdl->targets->target->__items as $target) {
+        foreach ($this->mdlAliasSync->targets->target->__items as $target) {
             $hostname = (string)$target->hostname;
-            $results[$hostname] = $this->sync($target);
+            $results[$hostname] = $this->sync($target, $force);
         }
 
         return $results;
@@ -171,19 +191,20 @@ class Sync
      * Attempts to sync all targets where the last sync attempt failed.
      *
      * @param bool $cron if true, retryInterval is observed
+     * @param boolean $force sync even when source data did not change since last successful sync
      * @return array status of the sync attempts
      */
-    public function syncFailed($cron = false)
+    public function syncFailed($cron = false, $force = false)
     {
-        $retryInterval = intval((string)$this->mdl->settings->retryInterval) * 60;
+        $retryInterval = intval((string)$this->mdlAliasSync->settings->retryInterval) * 60;
         if ($cron) {
             if ($retryInterval <= 0) {
-                return array('status' => "failed", 'error' => "Automatic retry disabled.");
+                return array('status' => "failed", 'details' => "Automatic retry disabled.");
             }
         }
 
         $results = array();
-        foreach ($this->mdl->targets->target->__items as $target) {
+        foreach ($this->mdlAliasSync->targets->target->__items as $target) {
             if ((string)$target->statusLastSync !== "ok") {
                 if ($cron &&
                     time() - $target->lastSync < $retryInterval) {
@@ -191,7 +212,7 @@ class Sync
                 }
 
                 $hostname = (string)$target->hostname;
-                $results[$hostname] = $this->sync($target);
+                $results[$hostname] = $this->sync($target, $force);
             }
         }
 
@@ -204,6 +225,14 @@ class Sync
     public function checkEnabled()
     {
         return $this->enabled;
+    }
+
+    /**
+     * @return bool true if update on config update is enabled by configuration, false otherwise.
+     */
+    public function configUpdateEnabled()
+    {
+        return !empty((string)$this->mdlAliasSync->settings->syncOnUpdate);
     }
 
     /**

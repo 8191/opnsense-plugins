@@ -155,6 +155,7 @@ POSSIBILITY OF SUCH DAMAGE.
                 <th data-column-id="description" data-type="string">{{ lang._('Description') }}</th>
                 <th data-column-id="lastSync" data-formatter="datetime">{{ lang._('Last Sync') }}</th>
                 <th data-column-id="statusLastSync" data-type="string">{{ lang._('Last Sync Status') }}</th>
+                <th data-column-id="detailsLastSync" data-type="string" data-visible="false">{{ lang._('Last Sync Status') }}</th>
                 <th data-column-id="lastSuccessfulSync" data-formatter="datetime">{{ lang._('Last Successful Sync') }}</th>
                 <th data-column-id="commands" data-width="9em" data-formatter="commands" data-sortable="false">{{ lang._('Commands') }}</th>
             </tr>

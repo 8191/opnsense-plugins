@@ -32,6 +32,7 @@ namespace OPNsense\AliasSync;
 
 use OPNsense\AliasSync\FieldTypes\VirtualField;
 use OPNsense\Base\BaseModel;
+use ReflectionClass;
 
 class AliasSync extends BaseModel
 {
@@ -46,6 +47,11 @@ class AliasSync extends BaseModel
     private $dbData = array();
 
     /**
+     * @var array the database model specified by VirtualFields in AliasSync.xml
+     */
+    private $dbModel = array();
+
+    /**
      * Updates or inserts a row in the database for each target of the XML model.
      *
      * @param string $uuid the uuid of the target to update
@@ -55,21 +61,17 @@ class AliasSync extends BaseModel
     {
         foreach ($this->targets->target->__items as $target) {
             $uuid = $target->getAttribute('uuid');
-            $this->saveTargetToDatabase($uuid, array(
-                'lastSync' => $target->lastSync,
-                'statusLastSync' => $target->statusLastSync,
-                'lastSuccessfulSync' => $target->lastSuccessfulSync
-            ));
+            $this->saveTargetToDatabase($uuid, $target);
         }
     }
 
     /**
-     * Populate VirtualFields with data from sqlite3 database
+     * Populate VirtualFields with data from sqlite database.
      */
     protected function init()
     {
         $this->openDatabase();
-        $this->queryDatabase();
+        $this->dbData = $this->queryDatabase();
 
         // For each target...
         foreach ($this->targets->target->__items as $target) {
@@ -91,43 +93,55 @@ class AliasSync extends BaseModel
      * Updates or inserts a row in the database.
      *
      * @param string $uuid the uuid of the target to update
-     * @param array $field values to update (attribute name as keys)
+     * @param Target $target target to save
      */
-    private function saveTargetToDatabase($uuid, $fields)
+    private function saveTargetToDatabase($uuid, $target)
     {
         // Target not in database (insert)
         if (empty($this->dbData[$uuid])) {
-            $stmt = $this->dbHandle->prepare('
-                insert into targets(uuid, lastSync, statusLastSync, lastSuccessfulSync)
-                values (:uuid, :lastSync, :statusLastSync, :lastSuccessfulSync)
-            ');
-            $stmt->bindValue(':uuid', $uuid);
-            $stmt->bindValue(':lastSync', (empty($fields['lastSync'])) ? 0 : $fields['lastSync']);
-            $stmt->bindValue(':statusLastSync', (empty($fields['statusLastSync'])) ? "" : $fields['statusLastSync']);
-            $stmt->bindValue(':lastSuccessfulSync', (empty($fields['lastSuccessfulSync'])) ? 0 : $fields['lastSuccessfulSync']);
+            // Prepare columns separated by commas
+            $fields = implode(",", array_keys($this->dbModel));
+            // Prepate ? with amount of columns separated by commas
+            $values = str_repeat(", ?", count($this->dbModel));
+            $sql_insert = "
+                insert into targets(uuid, $fields)
+                values (? $values)
+            ";
+            $stmt = $this->dbHandle->prepare($sql_insert);
+            $stmt->bindValue(1, $uuid);
+            $col = 2; // Count parameters, as we use indexed positional placeholders
+            foreach ($this->dbModel as $column => $type) {
+                $stmt->bindValue($col++, $target->$column);
+            }
             $stmt->execute();
         }
         // Target in database (update)
         else {
+            // Prepare "column = ?" separated by commas
+            $fields = implode(",", array_map(function($col){ return "$col = ?"; }, array_keys($this->dbModel)));
             // Update row
-            $stmt = $this->dbHandle->prepare('
+            $sql_update = "
                 update targets
-                set lastSync = :lastSync,
-                    statusLastSync = :statusLastSync,
-                    lastSuccessfulSync = :lastSuccessfulSync
-                where uuid = :uuid
-            ');
-            $stmt->bindValue(':uuid', $uuid);
-            $stmt->bindValue(':lastSync', (empty($fields['lastSync'])) ? $this->dbData[$uuid]['lastSync'] : $fields['lastSync']);
-            $stmt->bindValue(':statusLastSync', (empty($fields['statusLastSync'])) ? $this->dbData[$uuid]['lastSync'] : $fields['statusLastSync']);
-            $stmt->bindValue(':lastSuccessfulSync', (empty($fields['lastSuccessfulSync'])) ? $this->dbData[$uuid]['lastSuccessfulSync'] : $fields['lastSuccessfulSync']);
+                set $fields
+                where uuid = ?
+            ";
+            $stmt = $this->dbHandle->prepare($sql_update);
+            $col = 1; // Count parameters, as we use indexed positional placeholders
+            foreach ($this->dbModel as $column => $type) {
+                $stmt->bindValue($col++, $target->$column);
+            }
+            $stmt->bindValue($col, $uuid);
             $stmt->execute();
         }
     }
 
+    /**
+     * Open sqlite database connection and create db structure if needed.
+     */
     private function openDatabase()
     {
         $db_path = '/conf/aliassync.db';
+        $this->dbModel = $this->getTargetDbModel();
         $this->dbHandle = new \SQLite3($db_path);
         $this->dbHandle->busyTimeout(30000);
         $results = $this->dbHandle->query("PRAGMA table_info('targets')");
@@ -135,14 +149,27 @@ class AliasSync extends BaseModel
         while ($row = $results->fetchArray(SQLITE3_ASSOC)) {
             $known_fields[] = $row['name'];
         }
-        if (count($known_fields) == 0) {
+
+        // Check if number of columns matches (model fields + uuid)
+        if (count($known_fields) != count($this->dbModel) + 1) {
+            // If table exists, drop it
+            if (count($known_fields) != 0) {
+                $sql_drop = "
+                    drop table targets
+                ";
+                $this->dbHandle->exec($sql_drop);
+            }
+
+            // Prepare "column type" separated by commas
+            $columns = implode(",",
+                array_map(function($c, $t) {
+                    return "$c  $t";
+                }, array_keys($this->dbModel), $this->dbModel)
+            );
             // new database, setup
             $sql_create = "
                 create table targets (
-                      uuid               varchar2  -- target uui
-                    , lastSync           integer   -- time of last sync attempt
-                    , statusLastSync     varchar2  -- status of last sync attempt
-                    , lastSuccessfulSync integer   -- time of last successful sync
+                      uuid, $columns
                     , primary key (uuid)
                 );
             ";
@@ -150,13 +177,52 @@ class AliasSync extends BaseModel
         }
     }
 
+    /**
+     * Retireve targets table from database and return as array.
+     *
+     * @return array targets table
+     */
     private function queryDatabase()
     {
-        $this->dbData = array();
+        $data = array();
         $stmt = $this->dbHandle->prepare('select * from targets');
         $result = $stmt->execute();
         while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
-            $this->dbData[$row['uuid']] = $row;
+            $data[$row['uuid']] = $row;
         }
+
+        return $data;
+    }
+
+    /**
+     * Parses the model definition (AliasSync.xml) for all VirtualFields of
+     * the target ArrayField.
+     * @return array all VirtualFields of a Target with field name in key and type in value
+     */
+    private function getTargetDbModel()
+    {
+        $model = array();
+        $class_info = new ReflectionClass($this);
+        $model_filename = substr($class_info->getFileName(), 0, strlen($class_info->getFileName()) - 3) . "xml";
+        $model_xml = simplexml_load_file($model_filename);
+        
+        foreach ($model_xml->items->targets->target->children() as $xmlNode) {
+            $tagName = $xmlNode->getName();
+            $xmlNodeType = $xmlNode->attributes()["type"];
+            if ($xmlNodeType == ".\\VirtualField") {
+                $model[$tagName] = 'varchar2';
+
+                if ($xmlNode->count() > 0) {
+                    // if fieldtype contains properties, try to call the setters
+                    foreach ($xmlNode->children() as $fieldMethod) {
+                        if ($fieldMethod->getName() == "Type" && $fieldMethod->count() == 0) {
+                            $model[$tagName] = (string)$fieldMethod;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return $model;
     }
 }

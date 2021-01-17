@@ -41,15 +41,15 @@ $sync = new Sync();
 if ($single_target !== null) {
     $target = $sync->getTarget($single_target);
     if ($target !== null) {
-        $results = $sync->sync($target);
+        $results = $sync->sync($target, true);
     }
     else {
-        $results = array('status' => "failed", 'error' => "Invalid target passed.");
+        $results = array('status' => "failed", 'details' => "Invalid target passed.");
     }
 }
 // Sync all targets
 else {
-    $results = $sync->syncAll();
+    $results = $sync->syncAll(true);
 }
 
 echo json_encode($results) . "\n";

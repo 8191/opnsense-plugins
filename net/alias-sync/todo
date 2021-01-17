@@ -1,0 +1,2 @@
+* Add interval for force-sync (in case alias was modified on target without modification on source)
+* Implement retry interval (via cron)
