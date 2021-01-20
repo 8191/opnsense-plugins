@@ -97,75 +97,9 @@ class Sync
      * @param boolean $force sync even when source data did not change since last successful sync
      * @return array result of the sync attempt
      */
-    public function sync($target, $force = false)
+    public function syncTarget($target, $force = false)
     {
-        if (!$this->enabled) {
-            return array('status' => "failed", 'details' => "Alias synchronization globally disabled by configuration.");
-        }
-
-        $result = array();
-        if (!empty((string)$target->enabled)) {
-            $result['status'] = "failed";
-
-            if ($this->aliases === null || $this->aliasesHash) {
-                $this->aliases = $this->getRawNodes($this->mdlAlias);
-                $this->aliasesHash = sha1($this->mdlAlias->toXML()->asXML());
-            }
-
-            if (!$force && $target->syncedAliases == $this->aliasesHash) {
-                // Target is already up-to-date.
-                $result['status'] = "ok";
-                $result['details'] = "No changes since last sync.";
-                return $result;
-            }
-
-            $port = (empty($target->port)) ? 443 : intval((string)$target->port);
-            $curl = curl_init();
-            curl_setopt_array($curl, array(
-                CURLOPT_URL => "https://{$target->hostname}:{$port}/api/firewall/alias/import",
-                CURLOPT_POST => 1,
-                CURLOPT_POSTFIELDS => json_encode(array("data" => $this->aliases)),
-                CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_USERPWD => "{$target->apiKey}:{$target->apiSecret}",
-                CURLOPT_CONNECTTIMEOUT => intval((string)$target->timeout),
-                CURLOPT_RETURNTRANSFER => true
-            ));
-
-            $response = json_decode(curl_exec($curl), true);
-            $code = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-            $error = curl_error($curl);
-            $errno = curl_errno($curl);
-            curl_close($curl);
-
-            if ($errno == 0 && $code == 200) {
-                if (!empty($response['status'])) {
-                    $result['status'] = $response['status'];
-
-                    if ($result['status'] == "ok") {
-                        $target->lastSuccessfulSync = time();
-                        $target->syncedAliases = $this->aliasesHash;
-                        $result['details'] = "Added {$response['new']} of {$response['existing']} aliases.";
-                    }
-                    else {
-                        $result['details'] = "Syncing rejected by target.";
-                        $result['validations'] = $response['validations'];
-                    }
-                }
-            }
-            else {
-                $result['details'] = "$errno: $error";
-            }
-
-            $target->lastSync = time();
-            $target->statusLastSync = $result['status'];
-            $target->detailsLastSync = $result['details'];
-        }
-        else {
-            return array('status' => "failed", 'details' => "Target disabled by configuration.");
-        }
-
-        // TODO: move out (to prevent several savings when calling method in loop (e.g. in syncAll or syncFailed)
+        $result = $this->sync($target, $force);
         $this->mdlAliasSync->serializeToDatabase();
         return $result;
     }
@@ -184,6 +118,7 @@ class Sync
             $results[$hostname] = $this->sync($target, $force);
         }
 
+        $this->mdlAliasSync->serializeToDatabase();
         return $results;
     }
 
@@ -216,6 +151,7 @@ class Sync
             }
         }
 
+        $this->mdlAliasSync->serializeToDatabase();
         return $results;
     }
 
@@ -233,6 +169,98 @@ class Sync
     public function configUpdateEnabled()
     {
         return !empty((string)$this->mdlAliasSync->settings->syncOnUpdate);
+    }
+
+    /**
+     * Attempts to sync a target.
+     *
+     * @param \OPNsense\AliasSync\AliasSync $target target object to sync
+     * @param boolean $force sync even when source data did not change since last successful sync
+     * @return array result of the sync attempt
+     */
+    private function sync($target, $force = false)
+    {
+        if (!$this->enabled) {
+            return array('status' => "failed", 'details' => "Alias synchronization globally disabled by configuration.");
+        }
+
+        $result = array();
+        if (!empty((string)$target->enabled)) {
+            $result = $this->syncAliases($target, $force);
+        }
+        else {
+            return array('status' => "failed", 'details' => "Target disabled by configuration.");
+        }
+
+        return $result;
+    }
+
+    /**
+     * Attempts to sync aliases to a target.
+     *
+     * @param \OPNsense\AliasSync\AliasSync $target target object to sync
+     * @param boolean $force sync even when source data did not change since last successful sync
+     * @return array result of the sync attempt
+     */
+    private function syncAliases($target, $force)
+    {
+        $result['status'] = "failed";
+
+        if ($this->aliases === null || empty($this->aliasesHash)) {
+            $this->aliases = $this->getRawNodes($this->mdlAlias);
+            $this->aliasesHash = sha1($this->mdlAlias->toXML()->asXML());
+        }
+
+        if (!$force && $target->syncedAliases == $this->aliasesHash) {
+            // Target is already up-to-date.
+            $result['status'] = "ok";
+            $result['details'] = "No changes since last sync.";
+            return $result;
+        }
+
+        $port = (empty($target->port)) ? 443 : intval((string)$target->port);
+        $curl = curl_init();
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => "https://{$target->hostname}:{$port}/api/firewall/alias/import",
+            CURLOPT_POST => 1,
+            CURLOPT_POSTFIELDS => json_encode(array("data" => $this->aliases)),
+            CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERPWD => "{$target->apiKey}:{$target->apiSecret}",
+            CURLOPT_CONNECTTIMEOUT => intval((string)$target->timeout),
+            CURLOPT_RETURNTRANSFER => true
+        ));
+
+        $response = json_decode(curl_exec($curl), true);
+        $code = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $error = curl_error($curl);
+        $errno = curl_errno($curl);
+        curl_close($curl);
+
+        if ($errno == 0 && $code == 200) {
+            if (!empty($response['status'])) {
+                $result['status'] = $response['status'];
+
+                if ($result['status'] == "ok") {
+                    $target->lastSuccessfulSync = time();
+                    $target->syncedAliases = $this->aliasesHash;
+                    $result['details'] = "Added {$response['new']} of {$response['existing']} aliases.";
+                }
+                else {
+                    $result['details'] = "Syncing rejected by target.";
+                    $result['validations'] = $response['validations'];
+                }
+            }
+        }
+        else {
+            $result['details'] = "$errno: $error";
+        }
+
+        $target->lastSync = time();
+        $target->statusLastSync = $result['status'];
+        $target->detailsLastSync = $result['details'];
+
+        return $result;
     }
 
     /**

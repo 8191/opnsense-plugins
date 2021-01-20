@@ -41,7 +41,7 @@ $sync = new Sync();
 if ($single_target !== null) {
     $target = $sync->getTarget($single_target);
     if ($target !== null) {
-        $results = $sync->sync($target, true);
+        $results = $sync->syncTarget($target, true);
     }
     else {
         $results = array('status' => "failed", 'details' => "Invalid target passed.");
