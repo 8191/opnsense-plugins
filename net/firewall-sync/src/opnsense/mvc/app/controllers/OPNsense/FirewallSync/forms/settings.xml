@@ -1,0 +1,20 @@
+<form>
+    <field>
+        <id>firewallsync.settings.enabled</id>
+        <label>Enabled</label>
+        <type>checkbox</type>
+        <help>Enable firewall sync service</help>
+    </field>
+    <field>
+        <id>firewallsync.settings.retryInterval</id>
+        <label>Retry interval (minutes)</label>
+        <type>text</type>
+        <help><![CDATA[Interval in seconds to retry failed syncs. 0 disables automatic retries.]]></help>
+    </field>
+    <field>
+        <id>firewallsync.settings.syncOnUpdate</id>
+        <label>Sync on config update</label>
+        <type>checkbox</type>
+        <help><![CDATA[Trigger sync on local configuration update. The sync itself is only performed if synced configuration has changed.]]></help>
+    </field>
+</form>

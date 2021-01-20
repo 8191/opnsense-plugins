@@ -1,0 +1,10 @@
+This plugin allows synchronizing firewall aliases and rules over several
+OPNsense instances.
+
+Typically one master instance is designated, which is the only instance where
+alias and rule records are maintained. The master instance then synchronizes the
+records to all other configured OPNsense instances.
+
+Alias synchronization is done via the OPNsense Core API, while rule synchronization
+requires the `firewall` module. This plugin is only required on the master instance.
+The firewall module is required on each target.

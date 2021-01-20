@@ -1,0 +1,9 @@
+<acl>
+    <page-user-firewallsync>
+        <name>Services: Firewall Sync</name>
+        <patterns>
+            <pattern>ui/firewallsync/*</pattern>
+            <pattern>api/firewallsync/*</pattern>
+        </patterns>
+    </page-user-firewallsync>
+</acl>

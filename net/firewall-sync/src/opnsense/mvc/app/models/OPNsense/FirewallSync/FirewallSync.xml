@@ -1,0 +1,92 @@
+<model>
+    <mount>//OPNsense/FirewallSync</mount>
+    <version>1.0.1</version>
+    <description>Sync firewall aliases and rules between several OPNsense instances.</description>
+    <items>
+        <settings>
+            <enabled type="BooleanField">
+                <default>0</default>
+                <Required>Y</Required>
+            </enabled>
+            <retryInterval type="IntegerField">
+                <default>60</default>
+                <MinimumValue>0</MinimumValue>
+                <Required>Y</Required>
+            </retryInterval>
+            <RetryCron type="ModelRelationField">
+                <Model>
+                    <queues>
+                        <source>OPNsense.Cron.Cron</source>
+                        <items>jobs.job</items>
+                        <display>description</display>
+                        <filters>
+                            <origin>/FirewallSync/</origin>
+                        </filters>
+                    </queues>
+                </Model>
+                <ValidationMessage>Related cron not found.</ValidationMessage>
+                <Required>N</Required>
+            </RetryCron>
+            <syncOnUpdate type="BooleanField">
+                <default>1</default>
+                <Required>Y</Required>
+            </syncOnUpdate>
+        </settings>
+        <targets>
+            <target type="ArrayField">
+                <hostname type="HostnameField">
+                    <Required>Y</Required>
+                    <Constraints>
+                      <check001>
+                        <ValidationMessage>A target with this hostname is already defined.</ValidationMessage>
+                        <type>UniqueConstraint</type>
+                      </check001>
+                    </Constraints>
+                </hostname>
+                <port type="PortField">
+                    <Required>N</Required>
+                    <default>443</default>
+                </port>
+                <apiKey type="TextField">
+                    <Mask>@^[A-Za-z0-9+/]{80}$@</Mask>
+                    <Required>Y</Required>
+                    <ValidationMessage>An API key is required.</ValidationMessage>
+                </apiKey>
+                <apiSecret type="TextField">
+                    <Mask>@^[A-Za-z0-9+/]{80}$@</Mask>
+                    <Required>Y</Required>
+                    <ValidationMessage>The API secret is required.</ValidationMessage>
+                </apiSecret>
+                <timeout type="NumericField">
+                    <Required>N</Required>
+                    <default>30</default>
+                </timeout>
+                <enabled type="BooleanField">
+                    <default>1</default>
+                    <Required>Y</Required>
+                </enabled>
+                <description type="TextField">
+                    <Required>N</Required>
+                </description>
+                <!-- Virtual fields not persisted to XML but sqlite3 -->
+                <lastSync type=".\VirtualField">
+                    <Type>integer</Type>
+                    <default>0</default>
+                </lastSync>
+                <statusLastSync type=".\VirtualField">
+                    <Type>varchar2</Type>
+                </statusLastSync>
+                <detailsLastSync type=".\VirtualField">
+                    <Type>varchar2</Type>
+                </detailsLastSync>
+                <lastSuccessfulSync type=".\VirtualField">
+                    <Type>integer</Type>
+                    <default>0</default>
+                </lastSuccessfulSync>
+                <syncedAliases type=".\VirtualField">
+                    <Type>varchar2</Type>
+                </syncedAliases>
+            </target>
+        </targets>
+    </items>
+</model>

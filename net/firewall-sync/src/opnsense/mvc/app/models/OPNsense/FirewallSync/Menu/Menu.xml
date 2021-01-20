@@ -1,0 +1,9 @@
+<menu>
+    <Services>
+        <FirewallSync VisibleName="Firewall Sync" cssClass="fa fa-exchange fa-fw">
+          <Configuration url="/ui/firewallsync#settings" order="10"/>
+          <Targets url="/ui/firewallsync#targets" order="10"/>
+          <Status url="/ui/firewallsync/status" order="20"/>
+        </FirewallSync>
+    </Services>
+</menu>

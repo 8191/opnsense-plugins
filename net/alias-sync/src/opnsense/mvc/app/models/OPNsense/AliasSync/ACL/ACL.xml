@@ -1,9 +1,0 @@
-<acl>
-    <page-user-aliassync>
-        <name>Services: Alias Sync</name>
-        <patterns>
-            <pattern>ui/aliassync/*</pattern>
-            <pattern>api/aliassync/*</pattern>
-        </patterns>
-    </page-user-aliassync>
-</acl>

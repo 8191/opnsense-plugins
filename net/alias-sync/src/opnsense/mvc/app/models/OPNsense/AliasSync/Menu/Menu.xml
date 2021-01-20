@@ -1,9 +1,0 @@
-<menu>
-    <Services>
-        <AliasSync VisibleName="Alias Sync" cssClass="fa fa-exchange fa-fw">
-          <Configuration url="/ui/aliassync#settings" order="10"/>
-          <Targets url="/ui/aliassync#targets" order="10"/>
-          <Status url="/ui/aliassync/status" order="20"/>
-        </AliasSync>
-    </Services>
-</menu>
